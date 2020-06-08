@@ -1,0 +1,69 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ .Values.image.name }}
+  labels:
+    app: {{ .Values.image.name }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: {{ .Values.image.name }}
+  strategy:
+    rollingUpdate:
+      maxSurge: {{ .Values.rollingUpdate.maxSurge }}
+      maxUnavailable: {{ .Values.rollingUpdate.maxUnavailable }}
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        checksum/config-configtoml: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        app: {{ .Values.image.name }}
+    spec:
+      containers:
+      - name: {{ .Values.image.name }}
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: [{{ .Values.args | quote }}]
+        ports:
+        - containerPort: {{ .Values.containerPort }}
+          protocol: TCP
+        env:
+        {{- range $name, $value := .Values.env }}
+        {{- if not (empty $value) }}
+        - name: {{ $name | quote }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+        volumeMounts:
+          - name: {{ .Values.image.name }}-config
+            mountPath: /config.yaml
+            subPath: config.yaml
+        resources:
+          requests:
+            cpu: {{ .Values.resources.cpu_requests }}
+            memory: {{ .Values.resources.memory_requests }}
+          limits:
+            cpu: {{ .Values.resources.cpu_limit }}
+            memory: {{ .Values.resources.memory_limit }}
+        readinessProbe:
+          timeoutSeconds: 2
+          initialDelaySeconds: 5
+          failureThreshold: 3
+          tcpSocket:
+            port: {{ .Values.containerPort }}
+        livenessProbe:
+          timeoutSeconds: 2
+          initialDelaySeconds: 5
+          failureThreshold: 3
+          tcpSocket:
+            port: {{ .Values.containerPort }}
+      volumes:
+        - name: {{ .Values.image.name }}-config
+          configMap:
+            name: {{ .Values.image.name }}-config
+            defaultMode: 0755
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 10 }}

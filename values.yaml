@@ -1,0 +1,48 @@
+## alertmanager container name
+##
+image:
+  repository: raffis/mongodb-query-exporter
+  tag: 1.0.0-beta4
+  pullPolicy: IfNotPresent
+  name: mongodb-query-exporter
+
+resources:
+  cpu_requests: "10m"
+  memory_requests: "100Mi"
+  cpu_limit: "100m"
+  memory_limit: "200Mi"
+
+rollingUpdate:
+  maxSurge: "1"
+  maxUnavailable: "1"
+
+nodeSelector: {}
+
+containerPort: 9412
+env: {}
+args: "--config=/config.yaml"
+
+config: |-
+  ---
+  bind: 0.0.0.0:9412
+  logLevel: info
+  mongodb:
+    uri: mongodb://mongodb-replicaset:27017
+    connectionTimeout: 10
+    maxConnection: 3
+    defaultCacheTime: 5
+  metrics:
+  - name: jobs_failed_total
+    type: gauge
+    help: 'Failed jobs in test db count metric'
+    value: total
+    labels: []
+    cacheTime: 10
+    constLabels: []
+    database: test
+    collection: jobs
+    realtime: false
+    pipeline: |
+      [
+        {"$match": {"status": 0}},{"$count":"total"}
+      ]
